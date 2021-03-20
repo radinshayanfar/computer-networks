@@ -4,24 +4,32 @@ import struct
 class Header:
     last_id = 0
 
-    def __init__(self, questions_count):
-        self.ID = Header.last_id
+    @staticmethod
+    def create_header(questions_count):
+        header = Header()
+        header.ID = Header.last_id
 
-        self.QR = 0b0
-        self.OPCODE = 0x0
-        self.AA = 0b0
-        self.TC = 0b0
-        self.RD = 0b0
-        self.RA = 0b0
-        self.Z = 0b000
-        self.RCODE = 0x0
+        header.QR = 0b0
+        header.OPCODE = 0x0
+        header.AA = 0b0
+        header.TC = 0b0
+        header.RD = 0b1
+        header.RA = 0b0
+        header.Z = 0b000
+        header.RCODE = 0x0
 
-        self.QDCOUNT = questions_count
-        self.ANCOUNT = 0x00
-        self.NSCOUNT = 0x00
-        self.ARCOUNT = 0x00
+        header.QDCOUNT = questions_count
+        header.ANCOUNT = 0x00
+        header.NSCOUNT = 0x00
+        header.ARCOUNT = 0x00
 
         Header.last_id += 1
+
+        return header
+
+    @staticmethod
+    def from_bytes(byte_data):
+        pass
 
     def to_bytes(self):
         out = bytearray()

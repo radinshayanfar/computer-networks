@@ -11,9 +11,8 @@ DNS_PORT = 53
 
 if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    query = DNSQuery([{"qname": "radin-shayanfar.ir", "qtype": Question.QTYPE_A, "qclass": Question.CLASS_IN}])
-    # query2 = DNSQuery([{"qname": "www3.l.google.com", "qtype": Question.QTYPE_AAAA, "qclass": Question.CLASS_IN}])
+    query = DNSQuery.create_query([{"qname": "radin-shayanfar.ir", "qtype": Question.QTYPE_A, "qclass": Question.CLASS_IN}])
+    query2 = DNSQuery.create_query([{"qname": "www3.l.google.com", "qtype": Question.QTYPE_AAAA, "qclass": Question.CLASS_IN}])
 
     sock.sendto(query.to_bytes(), (DNS_IP, DNS_PORT))
     # sock.sendto(query2.to_bytes(), (DNS_IP, DNS_PORT))

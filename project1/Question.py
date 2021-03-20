@@ -12,10 +12,19 @@ class Question:
     QTYPE_TXT = 16
     QTYPE_AAAA = 28
 
-    def __init__(self, qname, qtype, qclass):
-        self.qname = qname
-        self.qtype = qtype
-        self.qclass = qclass
+    @staticmethod
+    def create_question(qname, qtype, qclass):
+        question = Question()
+
+        question.qname = qname
+        question.qtype = qtype
+        question.qclass = qclass
+
+        return question
+
+    @staticmethod
+    def from_bytes(byte_data):
+        pass
 
     def name_to_bytes(self):
         qname = self.qname

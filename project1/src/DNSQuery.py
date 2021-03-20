@@ -3,12 +3,20 @@ from Question import Question
 
 
 class DNSQuery:
-    def __init__(self, questions):
-        self.header = Header(len(questions))
+    @staticmethod
+    def create_query(questions):
+        query = DNSQuery()
+        query.header = Header.create_header(len(questions))
 
-        self.questions = []
+        query.questions = []
         for question in questions:
-            self.questions.append(Question(**question))
+            query.questions.append(Question.create_question(**question))
+
+        return query
+
+    @staticmethod
+    def from_bytes(byte_data):
+        pass
 
     def to_bytes(self):
         out = bytearray()
@@ -18,3 +26,4 @@ class DNSQuery:
             out.extend(question.to_bytes())
 
         return out
+
