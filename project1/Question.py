@@ -24,7 +24,28 @@ class Question:
 
     @staticmethod
     def from_bytes(byte_data):
-        pass
+        question = Question()
+
+        position = 0
+        question.qname = ''
+        while True:
+            length = struct.unpack("!B", byte_data[position:position + 1])[0]
+            position += 1
+
+            if length == 0:
+                break
+
+            question.qname += byte_data[position:position + length].decode('ascii') + '.'
+            position += length
+
+        question.qtype = struct.unpack("!H", byte_data[position: position + 2])
+        position += 2
+        question.qclass = struct.unpack("!H", byte_data[position: position + 2])
+        position += 2
+
+        print(question.qname, question.qtype, question.qclass)
+
+        return question, position
 
     def name_to_bytes(self):
         qname = self.qname

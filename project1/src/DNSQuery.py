@@ -16,7 +16,17 @@ class DNSQuery:
 
     @staticmethod
     def from_bytes(byte_data):
-        pass
+        query = DNSQuery()
+        query.header = Header.from_bytes(byte_data[:12])
+
+        query.questions = []
+        position = 12
+        for i in range(query.header.QDCOUNT):
+            question, length = Question.from_bytes(byte_data[position:])
+            query.questions.append(question)
+            position += length
+
+        return query
 
     def to_bytes(self):
         out = bytearray()

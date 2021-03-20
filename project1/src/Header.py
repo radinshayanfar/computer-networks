@@ -29,7 +29,19 @@ class Header:
 
     @staticmethod
     def from_bytes(byte_data):
-        pass
+        header = Header()
+        header.ID, options, header.QDCOUNT, header.ANCOUNT, header.NSCOUNT, header.ARCOUNT = struct.unpack("!HHHHHH", byte_data)
+
+        header.QR = (options & 0x8000) >> 15
+        header.OPCODE = (options & 0x3800) >> 11
+        header.AA = (options & 0x0400) >> 10
+        header.TC = (options & 0x0200) >> 9
+        header.RD = (options & 0x0100) >> 8
+        header.RA = (options & 0x0080) >> 7
+        header.Z = (options & 0x0070) >> 4
+        header.RCODE = options & 0x000F
+
+        return header
 
     def to_bytes(self):
         out = bytearray()
