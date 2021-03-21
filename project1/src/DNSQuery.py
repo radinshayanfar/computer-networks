@@ -2,6 +2,7 @@ import struct
 
 from Header import Header
 from Question import Question
+from ResourceRecord import ResourceRecord
 
 
 class DNSQuery:
@@ -26,7 +27,7 @@ class DNSQuery:
             if length == 0:  # root label
                 break
 
-            if length >> 14 == 0b11:  # a pointer
+            if length >> 6 == 0b11:  # a pointer
                 offset = struct.unpack("!H", byte_data[position - 1: position + 1])[0] & 0x3FFF
                 ptr_star, _ = DNSQuery.bytes_to_name(byte_data, offset)
                 qname += ptr_star
@@ -42,12 +43,27 @@ class DNSQuery:
     def from_bytes(byte_data):
         query = DNSQuery()
         query.header = Header.from_bytes(byte_data[:12])
+        position = 12
 
         query.questions = []
-        position = 12
         for i in range(query.header.QDCOUNT):
             question, position = Question.from_bytes(byte_data, position)
             query.questions.append(question)
+
+        query.answers = []
+        for i in range(query.header.ANCOUNT):
+            rr, position = ResourceRecord.from_bytes(byte_data, position)
+            query.answers.append(rr)
+
+        query.authorities = []
+        for i in range(query.header.NSCOUNT):
+            rr, position = ResourceRecord.from_bytes(byte_data, position)
+            query.authorities.append(rr)
+
+        query.additionals = []
+        for i in range(query.header.ARCOUNT):
+            rr, position = ResourceRecord.from_bytes(byte_data, position)
+            query.additionals.append(rr)
 
         return query
 

@@ -30,9 +30,9 @@ class Question:
 
         question.qname, position = DNSQuery.DNSQuery.bytes_to_name(byte_data, position)
 
-        question.qtype = struct.unpack("!H", byte_data[position: position + 2])
+        question.qtype = struct.unpack("!H", byte_data[position: position + 2])[0]
         position += 2
-        question.qclass = struct.unpack("!H", byte_data[position: position + 2])
+        question.qclass = struct.unpack("!H", byte_data[position: position + 2])[0]
         position += 2
 
         print(question.qname, question.qtype, question.qclass)
