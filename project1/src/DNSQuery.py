@@ -7,9 +7,9 @@ from ResourceRecord import ResourceRecord
 
 class DNSQuery:
     @staticmethod
-    def create_query(questions):
+    def create_query(questions, recursion=False):
         query = DNSQuery()
-        query.header = Header.create_header(len(questions))
+        query.header = Header.create_header(len(questions), recursion)
 
         query.questions = []
         for question in questions:

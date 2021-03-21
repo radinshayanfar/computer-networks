@@ -35,8 +35,6 @@ class Question:
         question.qclass = struct.unpack("!H", byte_data[position: position + 2])[0]
         position += 2
 
-        print(question.qname, question.qtype, question.qclass)
-
         return question, position
 
     def name_to_bytes(self):

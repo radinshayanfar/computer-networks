@@ -25,6 +25,4 @@ class ResourceRecord:
         RR.RDATA = byte_data[position: position + RR.RDLENGTH]
         position += RR.RDLENGTH
 
-        print(RR.NAME)
-
         return RR, position

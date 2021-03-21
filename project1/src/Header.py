@@ -5,7 +5,7 @@ class Header:
     last_id = 0
 
     @staticmethod
-    def create_header(questions_count):
+    def create_header(questions_count, recursion):
         header = Header()
         header.ID = Header.last_id
 
@@ -13,7 +13,7 @@ class Header:
         header.OPCODE = 0x0
         header.AA = 0b0
         header.TC = 0b0
-        header.RD = 0b1
+        header.RD = 0b1 if recursion else 0b0
         header.RA = 0b0
         header.Z = 0b000
         header.RCODE = 0x0
