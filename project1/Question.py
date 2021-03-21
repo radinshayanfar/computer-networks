@@ -1,6 +1,8 @@
 import re
 import struct
 
+import DNSQuery
+
 
 class Question:
     CLASS_IN = 1
@@ -23,20 +25,10 @@ class Question:
         return question
 
     @staticmethod
-    def from_bytes(byte_data):
+    def from_bytes(byte_data, position):
         question = Question()
 
-        position = 0
-        question.qname = ''
-        while True:
-            length = struct.unpack("!B", byte_data[position:position + 1])[0]
-            position += 1
-
-            if length == 0:
-                break
-
-            question.qname += byte_data[position:position + length].decode('ascii') + '.'
-            position += length
+        question.qname, position = DNSQuery.DNSQuery.bytes_to_name(byte_data, position)
 
         question.qtype = struct.unpack("!H", byte_data[position: position + 2])
         position += 2
