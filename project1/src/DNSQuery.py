@@ -85,14 +85,14 @@ class DNSQuery:
 
         out += 'Answers:\n' if len(self.answers) > 0 else ''
         for answer in self.answers:
-            out += f"\tName: {answer.NAME}, Answer: {answer.get_data()}\n"
+            out += f"\tName: {answer.NAME}, Answer: {answer.RDATA}\n"
 
         out += 'Authorities:\n' if len(self.authorities) > 0 else ''
         for auth in self.authorities:
-            out += f"\tName: {auth.NAME}, Address: {auth.get_data()}\n"
+            out += f"\tName: {auth.NAME}, Address: {auth.RDATA}\n"
 
         out += 'Additionals:\n' if len(self.additionals) > 0 else ''
         for additional in self.additionals:
-            out += f"\tName: {additional.NAME}, Address: {additional.get_data()}\n"
+            out += f"\tName: {additional.NAME}, Address: {additional.RDATA}\n"
 
         return out

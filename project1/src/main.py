@@ -29,7 +29,7 @@ def resolve_dfs(query, recursion, server, print_output):
         return None
 
     for auth in response.authorities:
-        resolvent = resolve_dfs(query, recursion, (auth.get_data(), DNS_PORT), print_output)
+        resolvent = resolve_dfs(query, recursion, (auth.RDATA, DNS_PORT), print_output)
         if resolvent is not None:
             return resolvent
 
@@ -63,11 +63,11 @@ def resolve_from_file(filename, output_filename, recursion, server=(DNS_IP, DNS_
     with open(filename, 'r') as f:
         queries_reader = csv.DictReader(f)
         for row in queries_reader:
-            resolved = resolve_single(row['name'], row['type'].upper(), True, server, True)
+            resolved = resolve_single(row['name'], row['type'].upper(), True, server, False)
             if resolved is None:
                 continue
             for answer in resolved.answers:
-                results.append([resolved.questions[0].qname, answer.get_type_text(), answer.get_data()])
+                results.append([resolved.questions[0].qname, answer.get_type_text(), answer.RDATA])
 
     with open(output_filename, 'w') as f:
         results_writer = csv.writer(f)
