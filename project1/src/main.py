@@ -1,3 +1,4 @@
+import csv
 import socket
 import argparse
 
@@ -50,11 +51,28 @@ def resolve_single(qname, qtype, recursion, server=(DNS_IP, DNS_PORT), print_out
         qtype = Question.QTYPE_TXT
 
     query = DNSQuery.create_query([{"qname": qname, "qtype": qtype, "qclass": Question.CLASS_IN}], recursion)
-    resolve_dfs(query, recursion, server, print_output)
+    result = resolve_dfs(query, recursion, server, print_output)
+    if print_output and result is None:
+        print("===== Not found :(")
+
+    return result
 
 
 def resolve_from_file(filename, output_filename, recursion, server=(DNS_IP, DNS_PORT)):
-    pass
+    results = []
+    with open(filename, 'r') as f:
+        queries_reader = csv.DictReader(f)
+        for row in queries_reader:
+            resolved = resolve_single(row['name'], row['type'].upper(), True, server, True)
+            if resolved is None:
+                continue
+            for answer in resolved.answers:
+                results.append([resolved.questions[0].qname, answer.get_type_text(), answer.get_data()])
+
+    with open(output_filename, 'w') as f:
+        results_writer = csv.writer(f)
+        results_writer.writerow(['name', 'type', 'value'])
+        results_writer.writerows(results)
 
 
 if __name__ == '__main__':

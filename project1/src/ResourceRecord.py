@@ -30,6 +30,20 @@ class ResourceRecord:
 
         return RR, position
 
+    def get_type_text(self):
+        if self.TYPE == Question.QTYPE_A:
+            return 'A'
+        elif self.TYPE == Question.QTYPE_AAAA:
+            return 'AAAA'
+        elif self.TYPE == Question.QTYPE_NS:
+            return 'NS'
+        elif self.TYPE == Question.QTYPE_CNAME:
+            pass
+        elif self.TYPE == Question.QTYPE_MX:
+            return 'MX'
+        elif self.TYPE == Question.QTYPE_TXT:
+            return 'TXT'
+
     def get_data(self):
         if self.TYPE == Question.QTYPE_A:
             return self.__parse_a()
