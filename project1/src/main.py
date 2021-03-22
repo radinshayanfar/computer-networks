@@ -12,7 +12,30 @@ DNS_IP = "4.2.2.4"
 DNS_PORT = 53
 
 
-def resolve_from_std(qname, qtype, recursion):
+def resolve_dfs(query, recursion, server, print_output):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.sendto(query.to_bytes(), server)
+    data, _ = sock.recvfrom(512)
+    response = DNSQuery.from_bytes(data)
+
+    if print_output:
+        print(F"Server: {server[0]}")
+        print(response)
+
+    if response.header.ANCOUNT > 0:
+        return response
+    if len(response.authorities) == 1 and response.authorities[0].TYPE == Question.QTYPE_SOA:
+        return None
+
+    for auth in response.authorities:
+        resolvent = resolve_dfs(query, recursion, (auth.get_data(), DNS_PORT), print_output)
+        if resolvent is not None:
+            return resolvent
+
+    return None
+
+
+def resolve_single(qname, qtype, recursion, server=(DNS_IP, DNS_PORT), print_output=True):
     if qtype == 'A':
         qtype = Question.QTYPE_A
     elif qtype == 'AAAA':
@@ -26,22 +49,11 @@ def resolve_from_std(qname, qtype, recursion):
     elif qtype == 'TXT':
         qtype = Question.QTYPE_TXT
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    query = DNSQuery.create_query(
-        [{"qname": qname, "qtype": qtype, "qclass": Question.CLASS_IN}])
-    # query2 = DNSQuery.create_query(
-    #     [{"qname": "www3.l.google.com", "qtype": Question.QTYPE_AAAA, "qclass": Question.CLASS_IN}])
-
-    sock.sendto(query.to_bytes(), (DNS_IP, DNS_PORT))
-    # sock.sendto(query2.to_bytes(), (DNS_IP, DNS_PORT))
-    data, _ = sock.recvfrom(512)
-    # data, _ = sock.recvfrom(512)
-    print(data)
-
-    query3 = DNSQuery.from_bytes(data)
+    query = DNSQuery.create_query([{"qname": qname, "qtype": qtype, "qclass": Question.CLASS_IN}], recursion)
+    resolve_dfs(query, recursion, server, print_output)
 
 
-def resolve_from_file(filename, output_filename, recursion):
+def resolve_from_file(filename, output_filename, recursion, server=(DNS_IP, DNS_PORT)):
     pass
 
 
@@ -50,8 +62,10 @@ if __name__ == '__main__':
 
     parser.add_argument('-r', '--recursive', action='store_true')
     parser.add_argument('-f', '--file', action='store_true', help='reading input from csv')
+    parser.add_argument('-s', '--server', type=str, action='store')
+    parser.add_argument('-p', '--port', type=int, action='store')
     std_file_mutex = parser.add_mutually_exclusive_group()
-    std_file_mutex.add_argument('-t', '--type', type=str.upper, choices=['A', 'AAAA', 'NS', 'CNAME', 'MX', 'TXT'],
+    std_file_mutex.add_argument('-t', '--type', type=str.upper, choices=['A', 'AAAA', 'NS', 'MX', 'TXT'],
                                 default='A', metavar='<qtype>')
     std_file_mutex.add_argument('-o', '--output', type=str, metavar='<output-file>')
 
@@ -61,8 +75,12 @@ if __name__ == '__main__':
 
     if args.file and args.output is None:
         parser.error('the following arguments are required when using --file: -o, --output')
+    if args.server is not None:
+        DNS_IP = args.server
+    if args.port is not None:
+        DNS_PORT = args.port
 
     if not args.file:
-        resolve_from_std(args.qname, args.type, args.recursive)
+        resolve_single(args.qname, args.type, args.recursive, (DNS_IP, DNS_PORT))
     else:
-        resolve_from_file(args.qname, args.output, args.recursive)
+        resolve_from_file(args.qname, args.output, args.recursive, (DNS_IP, DNS_PORT))

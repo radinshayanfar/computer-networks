@@ -75,3 +75,24 @@ class DNSQuery:
             out.extend(question.to_bytes())
 
         return out
+
+    def __str__(self):
+        out = ''
+
+        out += 'Questions:\n' if len(self.questions) > 0 else ''
+        for question in self.questions:
+            out += f"\tName: {question.qname}\n"
+
+        out += 'Answers:\n' if len(self.answers) > 0 else ''
+        for answer in self.answers:
+            out += f"\tName: {answer.NAME}, Answer: {answer.get_data()}\n"
+
+        out += 'Authorities:\n' if len(self.authorities) > 0 else ''
+        for auth in self.authorities:
+            out += f"\tName: {auth.NAME}, Address: {auth.get_data()}\n"
+
+        out += 'Additionals:\n' if len(self.additionals) > 0 else ''
+        for additional in self.additionals:
+            out += f"\tName: {additional.NAME}, Address: {additional.get_data()}\n"
+
+        return out

@@ -10,6 +10,7 @@ class Question:
     QTYPE_A = 1
     QTYPE_NS = 2
     QTYPE_CNAME = 5
+    QTYPE_SOA = 6
     QTYPE_MX = 15
     QTYPE_TXT = 16
     QTYPE_AAAA = 28
