@@ -34,8 +34,18 @@ def resolve_dfs(query, recursion, server, print_output, resolved_server=None):
     if resolved_server is None:
         resolved_server = server[0]
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(1)
     sock.sendto(query.to_bytes(), (resolved_server, server[1]))
-    data, _ = sock.recvfrom(512)
+
+    data = None
+    for i in range(3):  # trying 3 times if timeout occurred
+        try:
+            data, _ = sock.recvfrom(512)
+            break
+        except:
+            print(f"Request to {resolved_server} timed out")
+            continue
+
     response = DNSQuery.from_bytes(data)
 
     if print_output:
