@@ -17,7 +17,7 @@ class ResourceRecord:
         RR.CLASS = struct.unpack("!H", byte_data[position: position + 2])[0]
         position += 2
 
-        RR.TTL = struct.unpack("!I", byte_data[position: position + 4])[0]
+        RR.TTL = struct.unpack("!i", byte_data[position: position + 4])[0]
         position += 4
 
         RR.RDLENGTH = struct.unpack("!H", byte_data[position: position + 2])[0]

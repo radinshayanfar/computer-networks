@@ -2,6 +2,8 @@ import argparse
 import csv
 import re
 import socket
+import redis
+import pickle
 
 from DNSQuery import DNSQuery
 from Question import Question
@@ -12,6 +14,23 @@ DNS_IP = "4.2.2.4"
 # DNS_IP = "a.nic.ir"
 # DNS_IP = "pat.ns.cloudflare.com"
 DNS_PORT = 53
+
+
+def type_string_to_number(qtype):
+    if qtype == 'A':
+        qtype = Question.QTYPE_A
+    elif qtype == 'AAAA':
+        qtype = Question.QTYPE_AAAA
+    elif qtype == 'NS':
+        qtype = Question.QTYPE_NS
+    elif qtype == 'CNAME':
+        qtype = Question.QTYPE_CNAME
+    elif qtype == 'MX':
+        qtype = Question.QTYPE_MX
+    elif qtype == 'TXT':
+        qtype = Question.QTYPE_TXT
+
+    return qtype
 
 
 def ns_name_to_ip(server_name, additionals):
@@ -70,18 +89,7 @@ def resolve_dfs(query, recursion, server, print_output, resolved_server=None):
 
 
 def resolve_single(qname, qtype, recursion, server=(DNS_IP, DNS_PORT), print_output=True):
-    if qtype == 'A':
-        qtype = Question.QTYPE_A
-    elif qtype == 'AAAA':
-        qtype = Question.QTYPE_AAAA
-    elif qtype == 'NS':
-        qtype = Question.QTYPE_NS
-    elif qtype == 'CNAME':
-        qtype = Question.QTYPE_CNAME
-    elif qtype == 'MX':
-        qtype = Question.QTYPE_MX
-    elif qtype == 'TXT':
-        qtype = Question.QTYPE_TXT
+    qtype = type_string_to_number(qtype)
 
     query = DNSQuery.create_query([{"qname": qname, "qtype": qtype, "qclass": Question.CLASS_IN}], recursion)
     result = resolve_dfs(query, recursion, server, print_output)
@@ -108,6 +116,28 @@ def resolve_from_file(filename, output_filename, recursion, server=(DNS_IP, DNS_
         results_writer.writerows(results)
 
 
+def from_cache(qname, qtype):
+    if qname[-1] != '.':
+        qname += '.'
+    qtype = type_string_to_number(qtype)
+
+    serialized = rdb.get(f"{qname}:{qtype}")
+    if serialized is None:
+        return None
+    return pickle.loads(serialized)
+
+
+def to_cache(query):
+    if query is None:
+        return
+
+    repeats = rdb.incr(f"{query.questions[0].qname}:{query.questions[0].qtype}:count")
+    rdb.expire(f"{query.questions[0].qname}:{query.questions[0].qtype}:count", query.answers[0].TTL)
+    if repeats == 3:
+        serialized = pickle.dumps(query)
+        rdb.set(f"{query.questions[0].qname}:{query.questions[0].qtype}", serialized, ex=query.answers[0].TTL)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog="MyNSLookup", allow_abbrev=False)
 
@@ -131,7 +161,15 @@ if __name__ == '__main__':
     if args.port is not None:
         DNS_PORT = args.port
 
+    rdb = redis.Redis(host='localhost', port=6379, db=1)
+
     if not args.file:
-        resolve_single(args.qname, args.type, args.recursive, (DNS_IP, DNS_PORT))
+        cache = from_cache(args.qname, args.type)
+        if cache is None:
+            resolved = resolve_single(args.qname, args.type, args.recursive, (DNS_IP, DNS_PORT))
+            to_cache(resolved)
+        else:
+            print("===== From cache:")
+            print(cache)
     else:
         resolve_from_file(args.qname, args.output, args.recursive, (DNS_IP, DNS_PORT))
