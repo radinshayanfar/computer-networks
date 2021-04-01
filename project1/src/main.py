@@ -1,9 +1,10 @@
 import argparse
 import csv
+import pickle
 import re
 import socket
+
 import redis
-import pickle
 
 from DNSQuery import DNSQuery
 from Question import Question
@@ -64,6 +65,8 @@ def resolve_dfs(query, recursion, server, print_output, resolved_server=None):
         except:
             print(f"Request to {resolved_server} timed out")
             continue
+    if data is None:
+        return None
 
     response = DNSQuery.from_bytes(data)
 

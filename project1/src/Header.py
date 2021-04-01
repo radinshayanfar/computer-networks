@@ -30,7 +30,8 @@ class Header:
     @staticmethod
     def from_bytes(byte_data):
         header = Header()
-        header.ID, options, header.QDCOUNT, header.ANCOUNT, header.NSCOUNT, header.ARCOUNT = struct.unpack("!HHHHHH", byte_data)
+        header.ID, options, header.QDCOUNT, header.ANCOUNT, header.NSCOUNT, header.ARCOUNT = struct.unpack("!HHHHHH",
+                                                                                                           byte_data)
 
         header.QR = (options & 0x8000) >> 15
         header.OPCODE = (options & 0x3800) >> 11
