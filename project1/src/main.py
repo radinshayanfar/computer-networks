@@ -41,7 +41,7 @@ def ns_name_to_ip(server_name, additionals):
 
     if additionals is not None:
         for additional in additionals:
-            if server_name == additional.NAME:
+            if additional.TYPE == Question.QTYPE_A and server_name == additional.NAME:
                 return additional.RDATA
 
     resolved = resolve_single(server_name, Question.QTYPE_A, True, (DNS_IP, DNS_PORT), False)

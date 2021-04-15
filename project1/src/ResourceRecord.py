@@ -51,7 +51,7 @@ class ResourceRecord:
         elif self.TYPE == Question.QTYPE_NS:
             return self.__parse_ns(byte_data, position)
         elif self.TYPE == Question.QTYPE_CNAME:
-            pass
+            return self.__parse_cname(byte_data, position)
         elif self.TYPE == Question.QTYPE_MX:
             return self.__parse_mx(byte_data, position)
         elif self.TYPE == Question.QTYPE_TXT:
@@ -73,3 +73,6 @@ class ResourceRecord:
 
     def __parse_mx(self, byte_data, position):
         return DNSQuery.DNSQuery.bytes_to_name(byte_data, position + 2)[0]
+
+    def __parse_cname(self, byte_data, position):
+        return DNSQuery.DNSQuery.bytes_to_name(byte_data, position)[0]
