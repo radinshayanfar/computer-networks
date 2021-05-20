@@ -7,6 +7,7 @@ import sys
 
 
 def sock_send_recv(sock):
+    command_mode = False
     while True:
         try:
             read, write, _error = select.select([sys.stdin, sock], [], [])
@@ -20,7 +21,12 @@ def sock_send_recv(sock):
 
             if sys.stdin in read:
                 data = sys.stdin.readline().encode()
-                sock.sendall(data)
+                if data[:1] == 0x1d.to_bytes(1, 'big'):  # Toggle mode
+                    command_mode = not command_mode
+                elif command_mode:
+                    pass
+                else:
+                    sock.sendall(data)
 
         except KeyboardInterrupt as e:
             break
