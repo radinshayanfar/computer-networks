@@ -6,7 +6,24 @@ import socket
 import sys
 
 
-def sock_send_recv(sock):
+def command_parser(in_str: list):
+    cmd_parser = argparse.ArgumentParser(prog="", allow_abbrev=False, add_help=False, exit_on_error=False)
+    subparser = cmd_parser.add_subparsers(dest='commands')
+
+    upload = subparser.add_parser('upload')
+    _exec = subparser.add_parser('exec')
+    send = subparser.add_parser('send')
+
+    upload.add_argument('path', type=str, metavar='Path to the file')
+    _exec.add_argument('command', type=str, metavar='Command to be executed on the host')
+    send.add_argument('-e', '-encrypt', action='store_true', help='Encrypt the message using TLS')
+    send.add_argument('message', type=str, metavar='Message to be sent')
+
+    cmd_args = cmd_parser.parse_args(in_str)
+    return cmd_args
+
+
+def sock_send_recv(sock: socket.socket):
     command_mode = False
     while True:
         try:
@@ -20,11 +37,15 @@ def sock_send_recv(sock):
                 print(data.decode(), end='')
 
             if sys.stdin in read:
-                data = sys.stdin.readline().encode()
+                in_str = sys.stdin.readline()
+                data = in_str.encode()
                 if data[:1] == 0x1d.to_bytes(1, 'big'):  # Toggle mode
                     command_mode = not command_mode
                 elif command_mode:
-                    pass
+                    try:
+                        cmd_args = command_parser(in_str.strip().split())
+                    except argparse.ArgumentError as e:
+                        print(str(e))
                 else:
                     sock.sendall(data)
 
