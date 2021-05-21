@@ -4,7 +4,9 @@ import os
 import select
 import shlex
 import socket
+import ssl
 import sys
+import time
 import traceback
 from enum import Enum
 
@@ -42,7 +44,7 @@ def command_parser(in_str: list):
 
     upload.add_argument('path', type=str, metavar='Path to the file')
     _exec.add_argument('command', type=str, metavar='Command to be executed on the host')
-    send.add_argument('-e', '-encrypt', action='store_true', help='Encrypt the message using TLS')
+    send.add_argument('-e', '--encrypt', action='store_true', help='Encrypt the message using TLS')
     send.add_argument('message', type=str, metavar='Message to be sent')
 
     cmd_args = cmd_parser.parse_args(in_str)
@@ -87,6 +89,29 @@ def send_exec(sock: socket.socket, command: str):
         print(received.decode(), end='')
 
 
+def send_message(sock: socket.socket, message: str, send_iac: bool = True):
+    out = bytearray()
+    if send_iac:
+        out.append(0xff)
+        out.append(Commands.SEND.value)
+
+    message_len = str(len(message))
+    out.extend(b' ' * (LENGTH_SIZE - len(message_len)) + message_len.encode())
+    out.extend(message.encode())
+
+    sock.send(bytes(out))
+
+
+def send_e_message(sock: socket.socket, message: str):
+    sock.send(b'\xff')
+    sock.send(Commands.S_SEND.value.to_bytes(1, 'big'))
+
+    ssock = ssl.wrap_socket(sock, server_side=False, ssl_version=ssl.PROTOCOL_TLSv1_2, do_handshake_on_connect=True)
+    send_message(ssock, message, send_iac=False)
+
+    return ssock.unwrap()
+
+
 def sock_send_recv(sock: socket.socket):
     command_mode = False
     while True:
@@ -114,7 +139,10 @@ def sock_send_recv(sock: socket.socket):
                             elif cmd_args.commands == 'exec':
                                 send_exec(sock, cmd_args.command)
                             elif cmd_args.commands == 'send':
-                                pass
+                                if not cmd_args.encrypt:
+                                    send_message(sock, cmd_args.message)
+                                else:
+                                    sock = send_e_message(sock, cmd_args.message)
                         else:
                             data = escape_iap(data)
                             sock.sendall(data)
