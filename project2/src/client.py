@@ -4,6 +4,8 @@ import os
 import select
 import socket
 import sys
+import traceback
+from enum import Enum
 
 
 class Commands(Enum):
@@ -14,6 +16,7 @@ class Commands(Enum):
 
 
 IAP: int = 0xff
+LENGTH_SIZE: int = 10
 
 
 def escape_iap(data: bytes):
@@ -45,6 +48,27 @@ def command_parser(in_str: list):
     return cmd_args
 
 
+def upload_file(path: str) -> bytes:
+    out = bytearray(b'\xff')
+    out.append(Commands.UPLOAD.value)
+
+    file = bytearray()
+    with open(path, "rb") as f:
+        while byte := f.read(1):
+            file.extend(byte)
+
+    file_name = os.path.basename(path)
+    file_name_len = str(len(file_name))
+    out.extend(b' ' * (LENGTH_SIZE - len(file_name_len)) + file_name_len.encode())
+    out.extend(file_name.encode())
+
+    file_len = str(len(file))
+    out.extend(b' ' * (LENGTH_SIZE - len(file_len)) + file_len.encode())
+    out.extend(file)
+
+    return bytes(out)
+
+
 def sock_send_recv(sock: socket.socket):
     command_mode = False
     while True:
@@ -61,17 +85,29 @@ def sock_send_recv(sock: socket.socket):
             if sys.stdin in read:
                 in_str = sys.stdin.readline()
                 data = in_str.encode()
-                if data[:1] == 0x1d.to_bytes(1, 'big'):  # Toggle mode
+                if data[0] == 0x1d:  # Toggle mode
                     command_mode = not command_mode
-                elif command_mode:
+                else:
                     try:
-                        cmd_args = command_parser(in_str.strip().split())
+                        if command_mode:
+                            cmd_args = command_parser(in_str.strip().split())
+                            if cmd_args.commands == 'upload':
+                                data = upload_file(cmd_args.path)
+                            elif cmd_args.commands == 'exec':
+                                pass
+                            elif cmd_args.commands == 'send':
+                                pass
+                        else:
+                            data = escape_iap(data)
+                        if not command_mode or in_str.strip() != '':
+                            sock.sendall(data)
                     except argparse.ArgumentError as e:
                         print(str(e))
-                else:
-                    data = escape_iap(data)
-                    sock.sendall(data)
-
+                    except Exception as e:
+                        traceback.print_exc()
+                if command_mode:
+                    print("telnet> ", end='')
+                    sys.stdout.flush()
         except KeyboardInterrupt as e:
             break
         except socket.error as error:
