@@ -1,5 +1,7 @@
 import os
 import socket
+import ssl
+import time
 from enum import Enum
 
 IAP: int = 0xff
@@ -39,14 +41,37 @@ class ClientHandler:
         self.sock.sendall(b' ' * (LENGTH_SIZE - len(output_len)) + output_len.encode())
         self.sock.sendall(output)
 
+    def receive_message(self, sock: socket.socket = None):
+        if sock is None:
+            sock = self.sock
+
+        message_len = int(sock.recv(LENGTH_SIZE).decode())
+        message = sock.recv(message_len).decode()
+
+        print(f"---> Message from {sock.getpeername()[0]}:{sock.getpeername()[1]}:\n"
+              f"---> {message}")
+
+    def receive_e_message(self):
+        # context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        # context.load_cert_chain(certfile='../cert/test.crt', keyfile='../cert/test.key')
+        ssock = ssl.wrap_socket(self.sock, server_side=True, certfile="../cert/test.crt", keyfile="../cert/test.key",
+                                ssl_version=ssl.PROTOCOL_TLSv1_2)
+
+        self.receive_message(ssock)
+        self.sock = ssock.unwrap()
+
     def process_data(self, data: int):
         if self.iap_on:
             if data == IAP:
                 print(chr(data), end='')
-            if data == Commands.UPLOAD.value:
+            elif data == Commands.UPLOAD.value:
                 self.download_file()
-            if data == Commands.EXEC_.value:
+            elif data == Commands.EXEC_.value:
                 self.retrieve_exec()
+            elif data == Commands.SEND.value:
+                self.receive_message()
+            elif data == Commands.S_SEND.value:
+                self.receive_e_message()
 
             self.iap_on = False
         elif data == IAP:
