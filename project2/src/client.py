@@ -5,6 +5,20 @@ import select
 import socket
 import sys
 
+IAP: int = 0xff
+
+
+def escape_iap(data: bytes):
+    data = bytearray(data)
+    i = 0
+    while i < len(data):
+        if data[i] == IAP:
+            data.insert(i, IAP)
+            i += 1
+        i += 1
+
+    return bytes(data)
+
 
 def command_parser(in_str: list):
     cmd_parser = argparse.ArgumentParser(prog="", allow_abbrev=False, add_help=False, exit_on_error=False)
@@ -47,6 +61,7 @@ def sock_send_recv(sock: socket.socket):
                     except argparse.ArgumentError as e:
                         print(str(e))
                 else:
+                    data = escape_iap(data)
                     sock.sendall(data)
 
         except KeyboardInterrupt as e:
