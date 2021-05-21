@@ -2,6 +2,7 @@ import argparse
 import ipaddress
 import os
 import select
+import shlex
 import socket
 import sys
 import traceback
@@ -10,7 +11,7 @@ from enum import Enum
 
 class Commands(Enum):
     UPLOAD = 254
-    _EXEC = 253
+    EXEC_ = 253
     SEND = 252
     S_SEND = 251
 
@@ -48,7 +49,7 @@ def command_parser(in_str: list):
     return cmd_args
 
 
-def upload_file(path: str) -> bytes:
+def upload_file(sock: socket.socket, path: str):
     out = bytearray(b'\xff')
     out.append(Commands.UPLOAD.value)
 
@@ -66,7 +67,24 @@ def upload_file(path: str) -> bytes:
     out.extend(b' ' * (LENGTH_SIZE - len(file_len)) + file_len.encode())
     out.extend(file)
 
-    return bytes(out)
+    sock.sendall(bytes(out))
+
+
+def send_exec(sock: socket.socket, command: str):
+    out = bytearray(b'\xff')
+    out.append(Commands.EXEC_.value)
+
+    command_len = str(len(command))
+    out.extend(b' ' * (LENGTH_SIZE - len(command_len)) + command_len.encode())
+    out.extend(command.encode())
+
+    sock.sendall(bytes(out))
+
+    output_len = int(sock.recv(LENGTH_SIZE).decode())
+    while output_len > 0:
+        received = sock.recv(4096)
+        output_len -= len(received)
+        print(received.decode(), end='')
 
 
 def sock_send_recv(sock: socket.socket):
@@ -90,16 +108,15 @@ def sock_send_recv(sock: socket.socket):
                 else:
                     try:
                         if command_mode:
-                            cmd_args = command_parser(in_str.strip().split())
+                            cmd_args = command_parser(shlex.split(in_str.strip()))
                             if cmd_args.commands == 'upload':
-                                data = upload_file(cmd_args.path)
+                                upload_file(sock, cmd_args.path)
                             elif cmd_args.commands == 'exec':
-                                pass
+                                send_exec(sock, cmd_args.command)
                             elif cmd_args.commands == 'send':
                                 pass
                         else:
                             data = escape_iap(data)
-                        if not command_mode or in_str.strip() != '':
                             sock.sendall(data)
                     except argparse.ArgumentError as e:
                         print(str(e))
