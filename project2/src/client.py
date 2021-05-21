@@ -5,6 +5,14 @@ import select
 import socket
 import sys
 
+
+class Commands(Enum):
+    UPLOAD = 254
+    _EXEC = 253
+    SEND = 252
+    S_SEND = 251
+
+
 IAP: int = 0xff
 
 
