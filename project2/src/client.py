@@ -6,9 +6,10 @@ import shlex
 import socket
 import ssl
 import sys
-import time
 import traceback
 from enum import Enum
+
+from CommandsLogger import CommandsLogger
 
 
 class Commands(Enum):
@@ -41,6 +42,7 @@ def command_parser(in_str: list):
     upload = subparser.add_parser('upload')
     _exec = subparser.add_parser('exec')
     send = subparser.add_parser('send')
+    history = subparser.add_parser('history')
 
     upload.add_argument('path', type=str, metavar='Path to the file')
     _exec.add_argument('command', type=str, metavar='Command to be executed on the host')
@@ -133,6 +135,7 @@ def sock_send_recv(sock: socket.socket):
                 else:
                     try:
                         if command_mode:
+                            cmd_logger.log_command(in_str.strip())
                             cmd_args = command_parser(shlex.split(in_str.strip()))
                             if cmd_args.commands == 'upload':
                                 upload_file(sock, cmd_args.path)
@@ -143,6 +146,8 @@ def sock_send_recv(sock: socket.socket):
                                     send_message(sock, cmd_args.message)
                                 else:
                                     sock = send_e_message(sock, cmd_args.message)
+                            elif cmd_args.commands == 'history':
+                                [print(cmd.decode()) for cmd in cmd_logger.get_logs()]
                         else:
                             data = escape_iap(data)
                             sock.sendall(data)
@@ -205,6 +210,8 @@ if __name__ == '__main__':
     parser.add_argument('port', type=int, nargs='?', metavar='Port number')
 
     args = parser.parse_args()
+
+    cmd_logger = CommandsLogger()
 
     if args.scan is None and (args.hostname is None or args.port is None):
         parser.error('Hostname and port number must be given in non-scan mode.')
