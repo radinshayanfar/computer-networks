@@ -9,6 +9,7 @@ import sys
 import traceback
 from enum import Enum
 
+from MITMProxy import MITMProxy
 from CommandsLogger import CommandsLogger
 
 
@@ -43,11 +44,15 @@ def command_parser(in_str: list):
     _exec = subparser.add_parser('exec')
     send = subparser.add_parser('send')
     history = subparser.add_parser('history')
+    log = subparser.add_parser('log')
 
     upload.add_argument('path', type=str, metavar='Path to the file')
     _exec.add_argument('command', type=str, metavar='Command to be executed on the host')
     send.add_argument('-e', '--encrypt', action='store_true', help='Encrypt the message using TLS')
     send.add_argument('message', type=str, metavar='Message to be sent')
+    log_mutex = log.add_mutually_exclusive_group(required=True)
+    log_mutex.add_argument('-s', '--sent', action='store_true', help='Prints sent bytes')
+    log_mutex.add_argument('-r', '--received', action='store_true', help='Prints received bytes')
 
     cmd_args = cmd_parser.parse_args(in_str)
     return cmd_args
@@ -148,6 +153,8 @@ def sock_send_recv(sock: socket.socket):
                                     sock = send_e_message(sock, cmd_args.message)
                             elif cmd_args.commands == 'history':
                                 [print(cmd.decode()) for cmd in cmd_logger.get_logs()]
+                            elif cmd_args.commands == 'log':
+                                print(proxy.sent_buffer if cmd_args.sent else proxy.recv_buffer)
                         else:
                             data = escape_iap(data)
                             sock.sendall(data)
@@ -167,11 +174,15 @@ def sock_send_recv(sock: socket.socket):
 
 def connection_mode(args):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(args.timeout)
 
     try:
-        sock.connect((args.hostname, args.port))
-        print(f"Connected to {sock.getpeername()[0]}:{sock.getpeername()[1]}")
+        if not args.proxy:
+            sock.settimeout(args.timeout)
+            sock.connect((args.hostname, args.port))
+            print(f"Connected to {sock.getpeername()[0]}:{sock.getpeername()[1]}")
+        else:
+            proxy.run_server(args.hostname, args.port, args.timeout)
+            sock.connect((MITMProxy.PROXY_HOST, MITMProxy.PROXY_PORT))
     except socket.timeout as timeout:
         print("Connection timed out")
         exit()
@@ -205,6 +216,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-s', '--scan', type=str, action='store')
     parser.add_argument('-t', '--timeout', type=float, action='store', metavar='Timeout in seconds', default=2)
+    parser.add_argument('-p', '--proxy', action='store_true', help='Proxy mode for logging')
 
     parser.add_argument('hostname', type=str, nargs='?', metavar='Host name')
     parser.add_argument('port', type=int, nargs='?', metavar='Port number')
@@ -212,6 +224,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     cmd_logger = CommandsLogger()
+    if args.proxy:
+        proxy = MITMProxy()
 
     if args.scan is None and (args.hostname is None or args.port is None):
         parser.error('Hostname and port number must be given in non-scan mode.')
