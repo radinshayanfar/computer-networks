@@ -7,8 +7,8 @@ import threading
 
 
 class MITMProxy:
+    PROXY_PORT: int = None
     PROXY_HOST: str = '127.0.0.1'
-    PROXY_PORT: int = 32323
 
     def __init__(self):
         self._client_to_server_queue = queue.Queue()
@@ -17,8 +17,12 @@ class MITMProxy:
         self.recv_buffer = bytearray()
 
     def run_server(self, hostname: str, port: int, timeout: int):
-        threading.Thread(target=self._server_handler, args=(hostname, port, timeout), daemon=True).start()
-        threading.Thread(target=self._client_handler, daemon=True).start()
+        self._start_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._start_socket.bind((self.PROXY_HOST, 0))
+        MITMProxy.PROXY_PORT = self._start_socket.getsockname()[1]
+
+        threading.Thread(target=self._server_handler, args=(hostname, port, timeout), daemon=False).start()
+        threading.Thread(target=self._client_handler, daemon=False).start()
 
         return self.PROXY_HOST, self.PROXY_PORT
 
@@ -31,10 +35,12 @@ class MITMProxy:
             print(f"Connected to {server_socket.getpeername()[0]}:{server_socket.getpeername()[1]}")
         except socket.timeout as timeout:
             print("Connection timed out")
-            exit()
+            self._server_to_client_queue.put(None)
+            return
         except socket.error as error:
             print(os.strerror(error.errno), file=sys.stderr)
-            exit()
+            self._server_to_client_queue.put(None)
+            return
 
         while True:
             try:
@@ -44,34 +50,36 @@ class MITMProxy:
                     data = server_socket.recv(4096)
                     if not data:
                         print("Connection closed by foreign host.")
-                        # self._client_socket.close()
+                        self._server_to_client_queue.put(None)
                         break
                     self._server_to_client_queue.put(data)
 
                 try:
                     data = self._client_to_server_queue.get_nowait()
+                    if data is None:
+                        break
                     server_socket.sendall(data)
                 except queue.Empty:
                     pass
 
             except socket.error as error:
                 print(os.strerror(error.errno), file=sys.stderr)
-                # self._client_socket.close()
+                self._server_to_client_queue.put(None)
                 break
 
-    def _client_handler(self):
-        start_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        start_socket.bind((self.PROXY_HOST, self.PROXY_PORT))
-        start_socket.listen(1)
+        server_socket.close()
 
-        self._client_socket, address = start_socket.accept()
+    def _client_handler(self):
+        self._start_socket.listen(1)
+
+        client_socket, address = self._start_socket.accept()
 
         while True:
             try:
-                read, write, _error = select.select([self._client_socket], [], [], 0.001)
+                read, write, _error = select.select([client_socket], [], [], 0.001)
 
-                if self._client_socket in read:
-                    data = self._client_socket.recv(4096)
+                if client_socket in read:
+                    data = client_socket.recv(4096)
                     if not data:
                         break
                     self.sent_buffer.extend(data)
@@ -79,12 +87,20 @@ class MITMProxy:
 
                 try:
                     data = self._server_to_client_queue.get_nowait()
+                    if data is None:
+                        break
                     self.recv_buffer.extend(data)
-                    self._client_socket.sendall(data)
+                    client_socket.sendall(data)
                 except queue.Empty:
                     pass
             except socket.error as error:
                 print(os.strerror(error.errno), file=sys.stderr)
                 break
 
-        self._client_socket.close()
+        self._client_to_server_queue.put(None)
+        self._start_socket.close()
+        client_socket.close()
+
+    def close_sockets(self):
+        self._client_to_server_queue.put(None)
+        self._server_to_client_queue.put(None)

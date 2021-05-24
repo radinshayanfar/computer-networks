@@ -169,7 +169,7 @@ def sock_send_recv(sock: socket.socket):
             break
         except socket.error as error:
             print(os.strerror(error.errno), file=sys.stderr)
-            exit()
+            break
 
 
 def connection_mode(args):
@@ -185,10 +185,12 @@ def connection_mode(args):
             sock.connect((MITMProxy.PROXY_HOST, MITMProxy.PROXY_PORT))
     except socket.timeout as timeout:
         print("Connection timed out")
-        exit()
+        proxy.close_sockets()
+        return
     except socket.error as error:
         print(os.strerror(error.errno), file=sys.stderr)
-        exit()
+        proxy.close_sockets()
+        return
 
     sock_send_recv(sock)
 
