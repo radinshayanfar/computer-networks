@@ -2,6 +2,8 @@ import re
 import socket
 import subprocess
 
+from DHCPPacket import DHCPPacket
+
 CLIENT_PORT = 68
 SERVER_PORT = 67
 
@@ -30,6 +32,10 @@ if __name__ == '__main__':
 
     sock.bind(("0.0.0.0", CLIENT_PORT))
 
-    sock.sendto("test".encode(), ('<broadcast>', SERVER_PORT))
+    discover = DHCPPacket.create_discover(selected_nic)
+
+    sock.sendto(discover.to_bytes(), ('<broadcast>', SERVER_PORT))
+    print(sock.recv(1024))
 
     sock.close()
+
