@@ -80,7 +80,7 @@ class DHCPPacket:
         packet.ip_address = offer_packet.yiaddr
 
         # This value is stored as byte-like object. It doesn't need further packing
-        packet.server_id = offer_packet.options["ServerId"]
+        packet.server_id = offer_packet.options[DHCPPacket.OPTIONS["ServerId"]]
 
         return packet
 

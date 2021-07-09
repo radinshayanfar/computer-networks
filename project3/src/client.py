@@ -1,5 +1,7 @@
+import ipaddress
 import re
 import socket
+import struct
 import subprocess
 
 from DHCPPacket import DHCPPacket
@@ -38,9 +40,21 @@ if __name__ == '__main__':
 
     sock.sendto(discover.to_bytes(), ('<broadcast>', SERVER_PORT))
 
+    packet = None
     while True:
         packet_bytes = sock.recv(1024)
         packet = DHCPPacket.create_from_bytes(packet_bytes)
-        print(vars(packet))
+        if packet.xid != discover.xid:
+            continue
+        # print(struct.unpack("!I", packet.options[DHCPPacket.OPTIONS["ServerId"]])[0], int(ipaddress.IPv4Address('192.168.1.2')))
+        if struct.unpack("!I", packet.options[DHCPPacket.OPTIONS["ServerId"]])[0] == int(
+                ipaddress.IPv4Address('192.168.1.2')):
+            print(vars(packet))
+            break
+
+    request = DHCPPacket.create_request(packet)
+    sock.sendto(request.to_bytes(), ('<broadcast>', SERVER_PORT))
+    packet_bytes = sock.recv(1024)
+    print(vars(packet))
 
     sock.close()
