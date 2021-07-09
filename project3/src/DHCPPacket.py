@@ -31,7 +31,34 @@ class DHCPPacket:
 
         return packet
 
-    def discover_to_bytes(self):
+    @staticmethod
+    def create_from_bytes(_in: bytes):
+        packet = DHCPPacket()
+        packet.op, packet.htype, packet.hlen, packet.hops, packet.xid, packet.secs, flags, packet.ciaddr, \
+        packet.yiaddr, packet.siaddr, packet.giaddr = struct.unpack("!BBBBIHHIIII", _in[:7 * 4])
+
+        packet.broadcast = flags >> 15
+
+        chaddr = struct.unpack("!IH", _in[7 * 4:7 * 4 + 6])
+        packet.chaddr = (chaddr[0] << 16) | chaddr[1]
+
+        # +4 is for magic cookie
+        options_bytes = _in[59 * 4 + 4:]
+
+        packet.options = {}
+        i = 0
+        print(options_bytes[i])
+        while (option := options_bytes[i]) != 0xff:
+            length = options_bytes[i + 1]
+            i += 2
+            packet.options[option] = options_bytes[i: i + length]
+            i += length
+
+        packet.type = struct.unpack("!B", packet.options[DHCPPacket.OPTIONS["MSGType"]])[0]
+
+        return packet
+
+    def fixed_fields_to_bytes(self) -> bytearray:
         out = bytearray()
 
         # HEADER
@@ -56,8 +83,15 @@ class DHCPPacket:
         # Magic cookie
         out.extend(struct.pack("!I", DHCPPacket.MAGIC_COOKIE))
 
+        return out
+
+    def discover_to_bytes(self) -> bytearray:
+        out = bytearray()
+
+        out.extend(self.fixed_fields_to_bytes())
+
         # Options
-        out.extend(struct.pack("!BBB", DHCPPacket.OPTIONS["MSGType"], 1, DHCPPacket.MESSAGE_TYPES["DISCOVER"]))
+        out.extend(struct.pack("!BBB", DHCPPacket.OPTIONS["MSGType"], 1, self.type))
         out.extend(struct.pack("!BBBB", DHCPPacket.OPTIONS["ParameterList"], 2, DHCPPacket.OPTIONS["SubnetMask"],
                                DHCPPacket.OPTIONS["DNS"]))
 

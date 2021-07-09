@@ -33,9 +33,11 @@ if __name__ == '__main__':
     sock.bind(("0.0.0.0", CLIENT_PORT))
 
     discover = DHCPPacket.create_discover(selected_nic)
+    discover_rebuild = DHCPPacket.create_from_bytes(discover.to_bytes())
+    print(vars(discover_rebuild))
 
-    sock.sendto(discover.to_bytes(), ('<broadcast>', SERVER_PORT))
-    print(sock.recv(1024))
+    # sock.sendto(discover.to_bytes(), ('<broadcast>', SERVER_PORT))
+    # print(sock.recv(1024))
 
     sock.close()
 
