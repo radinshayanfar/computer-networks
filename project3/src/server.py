@@ -1,9 +1,11 @@
 import socket
 
-from DHCPPacket import DHCPPacket
+import DHCPPacket
 
 CLIENT_PORT = 68
 SERVER_PORT = 67
+
+SERVER_ID = socket.gethostbyname(socket.gethostname())
 
 if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -14,9 +16,10 @@ if __name__ == '__main__':
 
     while True:
         packet_bytes = sock.recv(1024)
-        packet = DHCPPacket.create_from_bytes(packet_bytes)
+        print("here")
+        packet = DHCPPacket.DHCPPacket.create_from_bytes(packet_bytes)
 
-        offer = DHCPPacket.create_offer(packet, '10.1.1.1', '255.255.255.0', '1.1.1.1', 86400)
+        offer = DHCPPacket.DHCPPacket.create_offer(packet, '10.1.1.1', '255.255.255.0', '1.1.1.1', 86400)
         sock.sendto(offer.to_bytes(), ('<broadcast>', CLIENT_PORT))
 
     sock.close()

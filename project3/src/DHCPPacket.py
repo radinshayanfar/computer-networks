@@ -3,11 +3,13 @@ import struct
 import ipaddress
 from random import randint
 
+import server
+
 
 class DHCPPacket:
     MAGIC_COOKIE = 0x63825363
     OPTIONS = {"MSGType": 53, "ClientID": 61, "ParameterList": 55, "SubnetMask": 1, "DNS": 6, "Hostname": 12,
-               "ServerId": 54, "AddressTime": 51, "End": 255}
+               "ServerId": 54, "AddressRequest": 50, "AddressTime": 51, "End": 255}
 
     MESSAGE_TYPES = {"DISCOVER": 1, "OFFER": 2, "REQUEST": 3, "DECLINE": 4, "ACK": 5}
 
@@ -33,27 +35,52 @@ class DHCPPacket:
         return packet
 
     @staticmethod
-    def create_offer(offer_packet: '__class__', offered_ip: str, subnet_mask: str, dns: str, lease: int) -> '__class__':
+    def create_offer(discover_packet: '__class__', offered_ip: str, subnet_mask: str, dns: str, lease: int) -> '__class__':
         packet = DHCPPacket()
         packet.type = DHCPPacket.MESSAGE_TYPES["OFFER"]
         packet.op = 2
         packet.htype = 1
         packet.hlen = 6
         packet.hops = 0
-        packet.xid = xid
+        packet.xid = discover_packet.xid
         packet.secs = 0
         packet.broadcast = 0
         packet.ciaddr = 0
         packet.yiaddr = int(ipaddress.IPv4Address(offered_ip))
-        packet.siaddr = socket.gethostbyname(socket.gethostname())
+        packet.siaddr = int(ipaddress.IPv4Address(server.SERVER_ID))
+        packet.giaddr = 0
+        packet.chaddr = discover_packet.chaddr
+
+        if DHCPPacket.OPTIONS["SubnetMask"] in discover_packet.options[DHCPPacket.OPTIONS["ParameterList"]]:
+            packet.subnet = int(ipaddress.IPv4Address(subnet_mask))
+        if DHCPPacket.OPTIONS["DNS"] in discover_packet.options[DHCPPacket.OPTIONS["ParameterList"]]:
+            packet.dns = int(ipaddress.IPv4Address(dns))
+        packet.lease = lease
+
+        return packet
+
+    @staticmethod
+    def create_request(offer_packet: '__class__') -> '__class__':
+        packet = DHCPPacket()
+        packet.type = DHCPPacket.MESSAGE_TYPES["REQUEST"]
+        packet.op = 1
+        packet.htype = 1
+        packet.hlen = 6
+        packet.hops = 0
+        packet.xid = offer_packet.xid
+        packet.secs = 0
+        packet.broadcast = 0
+        packet.ciaddr = 0
+        packet.yiaddr = 0
+        packet.siaddr = 0
         packet.giaddr = 0
         packet.chaddr = offer_packet.chaddr
 
-        if DHCPPacket.OPTIONS["SubnetMask"] in offer_packet.options[DHCPPacket.OPTIONS["ParameterList"]]:
-            packet.subnet = int(ipaddress.IPv4Address(subnet_mask))
-        if DHCPPacket.OPTIONS["DNS"] in offer_packet.options[DHCPPacket.OPTIONS["ParameterList"]]:
-            packet.dns = int(ipaddress.IPv4Address(dns))
-        packet.lease = lease
+        packet.hostname = socket.gethostname()
+        packet.ip_address = offer_packet.yiaddr
+
+        # This value is stored as byte-like object. It doesn't need further packing
+        packet.server_id = offer_packet.options["ServerId"]
 
         return packet
 
@@ -137,17 +164,34 @@ class DHCPPacket:
 
         out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["ServerId"], 4, self.siaddr))
         out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["AddressTime"], 4, self.lease))
-        if packet.subnet is not None:
+        if self.subnet is not None:
             out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["SubnetMask"], 4, self.subnet))
-        if packet.dns is not None:
+        if self.dns is not None:
             out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["DNS"], 4, self.dns))
 
         out.extend(struct.pack("!B", DHCPPacket.OPTIONS["End"]))
 
         return out
 
-    def request_to_bytes(self):
-        pass
+    def request_to_bytes(self) -> bytearray:
+        out = bytearray()
+
+        out.extend(self.fixed_fields_to_bytes())
+
+        # Options
+        out.extend(struct.pack("!BBB", DHCPPacket.OPTIONS["MSGType"], 1, self.type))
+        out.extend(struct.pack("!BBBB", DHCPPacket.OPTIONS["ParameterList"], 2, DHCPPacket.OPTIONS["SubnetMask"],
+                               DHCPPacket.OPTIONS["DNS"]))
+
+        out.extend(struct.pack("!BB", DHCPPacket.OPTIONS["Hostname"], len(self.hostname)))
+        out.extend(self.hostname.encode())
+
+        out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["AddressRequest"], 4, self.ip_address))
+        out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["ServerId"], 4, self.server_id))
+
+        out.extend(struct.pack("!B", DHCPPacket.OPTIONS["End"]))
+
+        return out
 
     def decline_to_bytes(self):
         pass
