@@ -1,17 +1,18 @@
 import socket
 import struct
+import ipaddress
 from random import randint
 
 
 class DHCPPacket:
     MAGIC_COOKIE = 0x63825363
     OPTIONS = {"MSGType": 53, "ClientID": 61, "ParameterList": 55, "SubnetMask": 1, "DNS": 6, "Hostname": 12,
-               "End": 255}
+               "ServerId": 54, "AddressTime": 51, "End": 255}
 
     MESSAGE_TYPES = {"DISCOVER": 1, "OFFER": 2, "REQUEST": 3, "DECLINE": 4, "ACK": 5}
 
     @staticmethod
-    def create_discover(interface: tuple):
+    def create_discover(interface: tuple) -> '__class__':
         packet = DHCPPacket()
         packet.type = DHCPPacket.MESSAGE_TYPES["DISCOVER"]
         packet.op = 1
@@ -20,7 +21,7 @@ class DHCPPacket:
         packet.hops = 0
         packet.xid = randint(0, 1 << 31)
         packet.secs = 0
-        packet.broadcast = 1
+        packet.broadcast = 0
         packet.ciaddr = 0
         packet.yiaddr = 0
         packet.siaddr = 0
@@ -28,6 +29,31 @@ class DHCPPacket:
         packet.chaddr = int(interface[1].replace(":", ""), 16)
 
         packet.hostname = socket.gethostname()
+
+        return packet
+
+    @staticmethod
+    def create_offer(offer_packet: '__class__', offered_ip: str, subnet_mask: str, dns: str, lease: int) -> '__class__':
+        packet = DHCPPacket()
+        packet.type = DHCPPacket.MESSAGE_TYPES["OFFER"]
+        packet.op = 2
+        packet.htype = 1
+        packet.hlen = 6
+        packet.hops = 0
+        packet.xid = xid
+        packet.secs = 0
+        packet.broadcast = 0
+        packet.ciaddr = 0
+        packet.yiaddr = int(ipaddress.IPv4Address(offered_ip))
+        packet.siaddr = socket.gethostbyname(socket.gethostname())
+        packet.giaddr = 0
+        packet.chaddr = offer_packet.chaddr
+
+        if DHCPPacket.OPTIONS["SubnetMask"] in offer_packet.options[DHCPPacket.OPTIONS["ParameterList"]]:
+            packet.subnet = int(ipaddress.IPv4Address(subnet_mask))
+        if DHCPPacket.OPTIONS["DNS"] in offer_packet.options[DHCPPacket.OPTIONS["ParameterList"]]:
+            packet.dns = int(ipaddress.IPv4Address(dns))
+        packet.lease = lease
 
         return packet
 
@@ -47,7 +73,6 @@ class DHCPPacket:
 
         packet.options = {}
         i = 0
-        print(options_bytes[i])
         while (option := options_bytes[i]) != 0xff:
             length = options_bytes[i + 1]
             i += 2
@@ -103,7 +128,23 @@ class DHCPPacket:
         return out
 
     def offer_to_bytes(self):
-        pass
+        out = bytearray()
+
+        out.extend(self.fixed_fields_to_bytes())
+
+        # Options
+        out.extend(struct.pack("!BBB", DHCPPacket.OPTIONS["MSGType"], 1, self.type))
+
+        out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["ServerId"], 4, self.siaddr))
+        out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["AddressTime"], 4, self.lease))
+        if packet.subnet is not None:
+            out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["SubnetMask"], 4, self.subnet))
+        if packet.dns is not None:
+            out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["DNS"], 4, self.dns))
+
+        out.extend(struct.pack("!B", DHCPPacket.OPTIONS["End"]))
+
+        return out
 
     def request_to_bytes(self):
         pass
