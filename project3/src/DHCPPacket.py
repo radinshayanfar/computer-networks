@@ -187,7 +187,8 @@ class DHCPPacket:
         out.extend(self.hostname.encode())
 
         out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["AddressRequest"], 4, self.ip_address))
-        out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["ServerId"], 4, self.server_id))
+        out.extend(struct.pack("!BB", DHCPPacket.OPTIONS["ServerId"], 4))
+        out.extend(self.server_id)
 
         out.extend(struct.pack("!B", DHCPPacket.OPTIONS["End"]))
 

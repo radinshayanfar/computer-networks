@@ -5,7 +5,7 @@ import DHCPPacket
 CLIENT_PORT = 68
 SERVER_PORT = 67
 
-SERVER_ID = socket.gethostbyname(socket.gethostname())
+SERVER_ID = '192.168.1.2'
 
 if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
