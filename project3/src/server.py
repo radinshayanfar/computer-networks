@@ -1,6 +1,7 @@
 import json
 import socket
 import struct
+import threading
 from ipaddress import IPv4Address
 
 import redis
@@ -99,7 +100,26 @@ def request_handle(request: 'DHCPPacket') -> 'DHCPPacket':
                                  SERVER_ID)
 
 
-if __name__ == '__main__':
+def show_clients():
+    print(header := "No.\t|Hostname\t|IP Address\t|\tMAC Address\t|Expire\t")
+    print("-" * len(header.expandtabs()))
+
+    with rdb.pipeline() as pipe:
+        for client_key in (keys := rdb.keys("dhcp:ip:*")):
+            ip = (decoded_key := client_key.decode()).split(":")[-1]
+            pipe.lrange(decoded_key, 0, -1)
+            pipe.ttl(decoded_key)
+        data = pipe.execute()
+
+    for i, client in enumerate(zip(data[0::2], data[1::2])):
+        hostname = client[0][1].decode()
+        ip = str(IPv4Address(int(keys[i].decode().split(":")[-1])))
+        mac = mac_num_to_str(int(client[0][0].decode()))
+        ttl = client[1]
+        print(f"{i+1}\t|{hostname}\t|{ip}\t|{mac}\t|{ttl}\t")
+
+
+def network_handler():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -122,3 +142,12 @@ if __name__ == '__main__':
             sock.sendto(response_packet.to_bytes(), ('<broadcast>', CLIENT_PORT))
 
     sock.close()
+
+
+if __name__ == '__main__':
+    threading.Thread(target=network_handler, daemon=True).start()
+
+    while True:
+        command = input()
+        if command == "show_clients":
+            show_clients()
