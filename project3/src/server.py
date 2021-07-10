@@ -53,8 +53,7 @@ def request_handle(request: 'DHCPPacket') -> 'DHCPPacket':
     db_record = rdb.lrange(f"dhcp:ip:{requested_ip}", 0, 0)
 
     if len(db_record) == 1 and int(db_record[0].decode()) != request.chaddr:  # reserved for someone else
-        # TODO: CREATE AND RETURN NACK PACKET
-        pass
+        return DHCPPacket.create_nak(request)
 
     with rdb.pipeline() as pipe:
         pipe.delete(f"dhcp:ip:{requested_ip}")
@@ -63,7 +62,8 @@ def request_handle(request: 'DHCPPacket') -> 'DHCPPacket':
         pipe.set(f"dhcp:mac:{request.chaddr}", f"dhcp:ip:{requested_ip}", ex=CONFIG["lease_time"])
         pipe.execute()
 
-    # TODO: CREATE AND RETURN ACK PACKET
+    return DHCPPacket.create_ack(request, requested_ip, '255.255.255.0', CONFIG["dns"], CONFIG["lease_time"],
+                                 SERVER_ID)
 
 
 if __name__ == '__main__':

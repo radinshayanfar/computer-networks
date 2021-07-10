@@ -9,7 +9,7 @@ class DHCPPacket:
     OPTIONS = {"MSGType": 53, "ClientID": 61, "ParameterList": 55, "SubnetMask": 1, "DNS": 6, "Hostname": 12,
                "ServerId": 54, "AddressRequest": 50, "AddressTime": 51, "End": 255}
 
-    MESSAGE_TYPES = {"DISCOVER": 1, "OFFER": 2, "REQUEST": 3, "DECLINE": 4, "ACK": 5}
+    MESSAGE_TYPES = {"DISCOVER": 1, "OFFER": 2, "REQUEST": 3, "ACK": 5, "NAK": 6}
 
     @staticmethod
     def create_discover(interface: tuple) -> '__class__':
@@ -33,7 +33,8 @@ class DHCPPacket:
         return packet
 
     @staticmethod
-    def create_offer(discover_packet: '__class__', offered_ip: int, subnet_mask: str, dns: str, lease: int, server_id: str) -> '__class__':
+    def create_offer(discover_packet: '__class__', offered_ip: int, subnet_mask: str, dns: str, lease: int,
+                     server_id: str) -> '__class__':
         packet = DHCPPacket()
         packet.type = DHCPPacket.MESSAGE_TYPES["OFFER"]
         packet.op = 2
@@ -79,6 +80,51 @@ class DHCPPacket:
 
         # This value is stored as byte-like object. It doesn't need further packing
         packet.server_id = offer_packet.options[DHCPPacket.OPTIONS["ServerId"]]
+
+        return packet
+
+    @staticmethod
+    def create_nak(request_packet: '__class__') -> '__class__':
+        packet = DHCPPacket()
+        packet.type = DHCPPacket.MESSAGE_TYPES["NAK"]
+        packet.op = 2
+        packet.htype = 1
+        packet.hlen = 6
+        packet.hops = 0
+        packet.xid = request_packet.xid
+        packet.secs = 0
+        packet.broadcast = 0
+        packet.ciaddr = 0
+        packet.yiaddr = 0
+        packet.siaddr = int(ipaddress.IPv4Address(server_id))
+        packet.giaddr = 0
+        packet.chaddr = request_packet.chaddr
+
+        return packet
+
+    @staticmethod
+    def create_ack(request_packet: '__class__', requested_ip: int, subnet_mask: str, dns: str, lease: int,
+                   server_id: str) -> '__class__':
+        packet = DHCPPacket()
+        packet.type = DHCPPacket.MESSAGE_TYPES["ACK"]
+        packet.op = 2
+        packet.htype = 1
+        packet.hlen = 6
+        packet.hops = 0
+        packet.xid = request_packet.xid
+        packet.secs = 0
+        packet.broadcast = 0
+        packet.ciaddr = 0
+        packet.yiaddr = requested_ip
+        packet.siaddr = int(ipaddress.IPv4Address(server_id))
+        packet.giaddr = 0
+        packet.chaddr = request_packet.chaddr
+
+        if DHCPPacket.OPTIONS["SubnetMask"] in request_packet.options[DHCPPacket.OPTIONS["ParameterList"]]:
+            packet.subnet = int(ipaddress.IPv4Address(subnet_mask))
+        if DHCPPacket.OPTIONS["DNS"] in request_packet.options[DHCPPacket.OPTIONS["ParameterList"]]:
+            packet.dns = int(ipaddress.IPv4Address(dns))
+        packet.lease = lease
 
         return packet
 
@@ -192,11 +238,38 @@ class DHCPPacket:
 
         return out
 
-    def decline_to_bytes(self):
-        pass
+    def nak_to_bytes(self):
+        out = bytearray()
+
+        out.extend(self.fixed_fields_to_bytes())
+
+        # Options
+        out.extend(struct.pack("!BBB", DHCPPacket.OPTIONS["MSGType"], 1, self.type))
+
+        out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["ServerId"], 4, self.siaddr))
+
+        out.extend(struct.pack("!B", DHCPPacket.OPTIONS["End"]))
+
+        return out
 
     def ack_to_bytes(self):
-        pass
+        out = bytearray()
+
+        out.extend(self.fixed_fields_to_bytes())
+
+        # Options
+        out.extend(struct.pack("!BBB", DHCPPacket.OPTIONS["MSGType"], 1, self.type))
+
+        out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["ServerId"], 4, self.siaddr))
+        out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["AddressTime"], 4, self.lease))
+        if self.subnet is not None:
+            out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["SubnetMask"], 4, self.subnet))
+        if self.dns is not None:
+            out.extend(struct.pack("!BBI", DHCPPacket.OPTIONS["DNS"], 4, self.dns))
+
+        out.extend(struct.pack("!B", DHCPPacket.OPTIONS["End"]))
+
+        return out
 
     def to_bytes(self):
         if self.type == DHCPPacket.MESSAGE_TYPES["DISCOVER"]:
@@ -205,7 +278,7 @@ class DHCPPacket:
             return self.offer_to_bytes()
         elif self.type == DHCPPacket.MESSAGE_TYPES["REQUEST"]:
             return self.request_to_bytes()
-        elif self.type == DHCPPacket.MESSAGE_TYPES["DECLINE"]:
-            return self.decline_to_bytes()
+        elif self.type == DHCPPacket.MESSAGE_TYPES["NAK"]:
+            return self.nak_to_bytes()
         elif self.type == DHCPPacket.MESSAGE_TYPES["ACK"]:
             return self.ack_to_bytes()
