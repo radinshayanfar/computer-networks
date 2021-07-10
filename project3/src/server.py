@@ -45,6 +45,8 @@ def get_new_ip(mac: int, hostname: str) -> int:
 
                 return ip
 
+    return -1
+
 
 def discover_handle(discover: 'DHCPPacket') -> 'DHCPPacket':
     # Check for blocked or reserved MACs
@@ -56,7 +58,8 @@ def discover_handle(discover: 'DHCPPacket') -> 'DHCPPacket':
                                        CONFIG["dns"], (1 << 32) - 1, SERVER_ID)
 
     new_ip = get_new_ip(discover.chaddr, discover.options[DHCPPacket.OPTIONS["Hostname"]].decode())
-    # TODO: CHECK NO IP AVAILABLE
+    if new_ip == -1:  # No IP available
+        return None
     offer = DHCPPacket.create_offer(discover, new_ip, '255.255.255.0', CONFIG["dns"], CONFIG["lease_time"], SERVER_ID)
 
     return offer
