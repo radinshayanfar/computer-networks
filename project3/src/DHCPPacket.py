@@ -1,9 +1,7 @@
+import ipaddress
 import socket
 import struct
-import ipaddress
 from random import randint
-
-import server
 
 
 class DHCPPacket:
@@ -35,7 +33,7 @@ class DHCPPacket:
         return packet
 
     @staticmethod
-    def create_offer(discover_packet: '__class__', offered_ip: str, subnet_mask: str, dns: str, lease: int) -> '__class__':
+    def create_offer(discover_packet: '__class__', offered_ip: int, subnet_mask: str, dns: str, lease: int, server_id: str) -> '__class__':
         packet = DHCPPacket()
         packet.type = DHCPPacket.MESSAGE_TYPES["OFFER"]
         packet.op = 2
@@ -46,8 +44,8 @@ class DHCPPacket:
         packet.secs = 0
         packet.broadcast = 0
         packet.ciaddr = 0
-        packet.yiaddr = int(ipaddress.IPv4Address(offered_ip))
-        packet.siaddr = int(ipaddress.IPv4Address(server.SERVER_ID))
+        packet.yiaddr = offered_ip
+        packet.siaddr = int(ipaddress.IPv4Address(server_id))
         packet.giaddr = 0
         packet.chaddr = discover_packet.chaddr
 
