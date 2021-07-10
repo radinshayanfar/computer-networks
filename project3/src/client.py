@@ -5,6 +5,7 @@ import struct
 import subprocess
 
 from DHCPPacket import DHCPPacket
+from Timeout import Timeout
 
 CLIENT_PORT = 68
 SERVER_PORT = 67
@@ -35,26 +36,54 @@ if __name__ == '__main__':
     sock.bind(("0.0.0.0", CLIENT_PORT))
 
     discover = DHCPPacket.create_discover(selected_nic)
-    # discover_rebuild = DHCPPacket.create_from_bytes(discover.to_bytes())
-    # print(vars(discover_rebuild))
 
-    sock.sendto(discover.to_bytes(), ('<broadcast>', SERVER_PORT))
+    sock.sendto(last_sent := discover.to_bytes(), ('<broadcast>', SERVER_PORT))
 
-    packet = None
+    timeout = Timeout()
+    timeout.start_time()
+    wait_state = DHCPPacket.MESSAGE_TYPES["OFFER"]
     while True:
-        packet_bytes = sock.recv(1024)
+        new_timeout, retransmit = timeout.get_timeout()
+        if new_timeout == -1:
+            print("Timeout occurred more than max limit. Starting over...")
+            discover = DHCPPacket.create_discover(selected_nic)
+            sock.sendto(last_sent := discover.to_bytes(), ('<broadcast>', SERVER_PORT))
+            timeout = Timeout()
+            timeout.start_time()
+            new_timeout, _ = timeout.get_timeout()
+            wait_state = DHCPPacket.MESSAGE_TYPES["OFFER"]
+        elif retransmit:
+            sock.sendto(last_sent, ('<broadcast>', SERVER_PORT))
+
+        sock.settimeout(new_timeout)
+        try:
+            packet_bytes = sock.recv(1024)
+        except (BlockingIOError, socket.timeout) as e:
+            continue
+
         packet = DHCPPacket.create_from_bytes(packet_bytes)
         if packet.xid != discover.xid:
             continue
-        # print(struct.unpack("!I", packet.options[DHCPPacket.OPTIONS["ServerId"]])[0], int(ipaddress.IPv4Address('192.168.1.2')))
-        if struct.unpack("!I", packet.options[DHCPPacket.OPTIONS["ServerId"]])[0] == int(
-                ipaddress.IPv4Address('192.168.1.2')):
-            print(vars(packet))
+        if packet.type != wait_state:
+            continue
+        if packet.type == DHCPPacket.MESSAGE_TYPES["NAK"]:
+            print("Unable to get IP!")
             break
+        if struct.unpack("!I", packet.options[DHCPPacket.OPTIONS["ServerId"]])[0] == int(
+                ipaddress.IPv4Address('192.168.1.1')):
+            continue
 
-    request = DHCPPacket.create_request(packet)
-    sock.sendto(request.to_bytes(), ('<broadcast>', SERVER_PORT))
-    packet_bytes = sock.recv(1024)
-    print(vars(packet))
+        if wait_state == DHCPPacket.MESSAGE_TYPES["OFFER"]:
+            request = DHCPPacket.create_request(packet)
+            sock.sendto(last_sent := request.to_bytes(), ('<broadcast>', SERVER_PORT))
+            wait_state = DHCPPacket.MESSAGE_TYPES["ACK"]
+            timeout = Timeout()
+            timeout.start_time()
+        elif wait_state == DHCPPacket.MESSAGE_TYPES["ACK"]:
+            expire = struct.unpack("!I", packet.options[DHCPPacket.OPTIONS["AddressTime"]])[0]
+            print("Got IP address:")
+            print(f"-> IP: {str(ipaddress.IPv4Address(packet.yiaddr))}")
+            print(f"-> Expire: {expire} second(s)")
+            break
 
     sock.close()
